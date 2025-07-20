@@ -1,102 +1,88 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Container, 
+  Typography, 
   Button, 
-  Select, 
-  MenuItem, 
+  Paper, 
   Table, 
   TableBody, 
   TableCell, 
   TableContainer, 
   TableHead, 
-  TableRow, 
-  Paper,
-  Snackbar,
-  Alert,
-  Box,
-  Typography,
+  TableRow,
+  Select,
+  MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Box
 } from '@mui/material';
-import { getAssociacoes, associarProdutoFornecedor, getProdutos, getFornecedores } from '../../services/api';
+import { 
+  getAssociacoes, 
+  associarProdutoFornecedor, 
+  desassociarProdutoFornecedor,
+  getProdutos,
+  getFornecedores 
+} from '../../services/api';
 
-function AssociacaoPage() {
+const AssociacaoPage = () => {
   const [associacoes, setAssociacoes] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState('');
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState('');
-  const [mensagem, setMensagem] = useState({ texto: '', tipo: '' });
-  const [openSnackbar, setOpenSnackbar] = useState(false);
 
   useEffect(() => {
-    buscarAssociacoes();
-    buscarProdutos();
-    buscarFornecedores();
+    carregarDados();
   }, []);
 
-  const buscarAssociacoes = async () => {
+  const carregarDados = async () => {
     try {
-      const response = await getAssociacoes();
-      setAssociacoes(response.data);
+      const [responseAssociacoes, responseProdutos, responseFornecedores] = await Promise.all([
+        getAssociacoes(),
+        getProdutos(),
+        getFornecedores()
+      ]);
+      
+      setAssociacoes(responseAssociacoes.data);
+      setProdutos(responseProdutos.data);
+      setFornecedores(responseFornecedores.data);
     } catch (error) {
-      mostrarErro('Erro ao carregar associações!');
-    }
-  };
-
-  const buscarProdutos = async () => {
-    try {
-      const response = await getProdutos();
-      setProdutos(response.data);
-    } catch (error) {
-      mostrarErro('Erro ao carregar produtos!');
-    }
-  };
-
-  const buscarFornecedores = async () => {
-    try {
-      const response = await getFornecedores();
-      setFornecedores(response.data);
-    } catch (error) {
-      mostrarErro('Erro ao carregar fornecedores!');
+      console.error('Erro ao carregar dados:', error);
     }
   };
 
   const handleAssociar = async () => {
     if (!produtoSelecionado || !fornecedorSelecionado) {
-      mostrarErro('Selecione um produto e um fornecedor!');
+      alert('Selecione um produto e um fornecedor!');
       return;
     }
 
     try {
       await associarProdutoFornecedor(produtoSelecionado, fornecedorSelecionado);
-      mostrarSucesso('Associação realizada com sucesso!');
-      buscarAssociacoes();
+      carregarDados();
       setProdutoSelecionado('');
       setFornecedorSelecionado('');
     } catch (error) {
-      mostrarErro(error.response?.data?.message || 'Erro ao associar!');
+      console.error('Erro ao associar:', error);
     }
   };
 
-  const mostrarSucesso = (texto) => {
-    setMensagem({ texto, tipo: 'success' });
-    setOpenSnackbar(true);
+  const handleDesassociar = async (associacaoId) => {
+    try {
+      await desassociarProdutoFornecedor(associacaoId);
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao desassociar:', error);
+    }
   };
-
-  const mostrarErro = (texto) => {
-    setMensagem({ texto, tipo: 'error' });
-    setOpenSnackbar(true);
-  };
-
-  const handleCloseSnackbar = () => setOpenSnackbar(false);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="lg">
       <Typography variant="h4" gutterBottom>
         Associação Produto-Fornecedor
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+      <Box display="flex" gap={2} marginBottom={4}>
         <FormControl fullWidth>
           <InputLabel>Produto</InputLabel>
           <Select
@@ -128,49 +114,49 @@ function AssociacaoPage() {
         </FormControl>
 
         <Button 
-          onClick={handleAssociar} 
           variant="contained" 
-          size="large"
-          sx={{ height: '56px' }}
+          onClick={handleAssociar}
+          style={{ height: '56px' }}
         >
           Associar
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Produto</TableCell>
-              <TableCell>Código de Barras</TableCell>
-              <TableCell>Fornecedor</TableCell>
-              <TableCell>CNPJ</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {associacoes.map((associacao) => (
-              <TableRow key={`${associacao.produtoId}-${associacao.fornecedorId}`}>
-                <TableCell>{associacao.produto.nome}</TableCell>
-                <TableCell>{associacao.produto.codigoBarras}</TableCell>
-                <TableCell>{associacao.fornecedor.nomeEmpresa}</TableCell>
-                <TableCell>{associacao.fornecedor.cnpj}</TableCell>
+      <Paper elevation={3}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Produto</TableCell>
+                <TableCell>Código de Barras</TableCell>
+                <TableCell>Fornecedor</TableCell>
+                <TableCell>CNPJ</TableCell>
+                <TableCell>Ações</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={mensagem.tipo}>
-          {mensagem.texto}
-        </Alert>
-      </Snackbar>
-    </Box>
+            </TableHead>
+            <TableBody>
+              {associacoes.map((associacao) => (
+                <TableRow key={`${associacao.produtoId}-${associacao.fornecedorId}`}>
+                  <TableCell>{associacao.produto.nome}</TableCell>
+                  <TableCell>{associacao.produto.codigoBarras}</TableCell>
+                  <TableCell>{associacao.fornecedor.nomeEmpresa}</TableCell>
+                  <TableCell>{associacao.fornecedor.cnpj}</TableCell>
+                  <TableCell>
+                    <Button 
+                      color="error"
+                      onClick={() => handleDesassociar(associacao.id)}
+                    >
+                      Desassociar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Container>
   );
-}
+};
 
 export default AssociacaoPage;

@@ -1,137 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Button, 
-  TextField, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper,
-  Snackbar,
-  Alert 
-} from '@mui/material';
-import { getProdutos, createProduto } from '../../services/api';
+import { Container, Typography, Button, Paper } from '@mui/material';
+import FormProduto from '../../components/FormProduto';
+import TabelaProdutos from '../../components/TabelaProdutos';
+import { getProdutos, createProduto, updateProduto, deleteProduto } from '../../services/api';
 
-function ProdutosPage() {
+const ProdutosPage = () => {
   const [produtos, setProdutos] = useState([]);
-  const [formData, setFormData] = useState({
-    nome: '',
-    codigoBarras: '',
-    descricao: '',
-    quantidade: 0,
-    categoria: ''
-  });
-  const [mensagem, setMensagem] = useState({ texto: '', tipo: '' });
-  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [produtoEditando, setProdutoEditando] = useState(null);
+  const [openForm, setOpenForm] = useState(false);
 
   useEffect(() => {
-    buscarProdutos();
+    carregarProdutos();
   }, []);
 
-  const buscarProdutos = async () => {
+  const carregarProdutos = async () => {
     try {
       const response = await getProdutos();
       setProdutos(response.data);
     } catch (error) {
-      setMensagem({ texto: 'Erro ao carregar produtos!', tipo: 'error' });
-      setOpenSnackbar(true);
+      console.error('Erro ao carregar produtos:', error);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSalvarProduto = async (produto) => {
     try {
-      await createProduto(formData);
-      setMensagem({ texto: 'Produto cadastrado com sucesso!', tipo: 'success' });
-      setOpenSnackbar(true);
-      buscarProdutos();
-      setFormData({ 
-        nome: '', 
-        codigoBarras: '', 
-        descricao: '', 
-        quantidade: 0, 
-        categoria: '' 
-      });
+      if (produtoEditando) {
+        await updateProduto(produtoEditando.id, produto);
+      } else {
+        await createProduto(produto);
+      }
+      carregarProdutos();
+      setOpenForm(false);
+      setProdutoEditando(null);
     } catch (error) {
-      setMensagem({ texto: error.response?.data?.message || 'Erro ao cadastrar produto!', tipo: 'error' });
-      setOpenSnackbar(true);
+      console.error('Erro ao salvar produto:', error);
     }
   };
 
-  const handleCloseSnackbar = () => setOpenSnackbar(false);
+  const handleEditarProduto = (produto) => {
+    setProdutoEditando(produto);
+    setOpenForm(true);
+  };
+
+  const handleExcluirProduto = async (id) => {
+    try {
+      await deleteProduto(id);
+      carregarProdutos();
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+    }
+  };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Cadastro de Produtos</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '500px', marginBottom: '20px' }}>
-        <TextField
-          label="Nome"
-          value={formData.nome}
-          onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-          required
-        />
-        <TextField
-          label="Código de Barras"
-          value={formData.codigoBarras}
-          onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
-        />
-        <TextField
-          label="Descrição"
-          value={formData.descricao}
-          onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-          required
-          multiline
-          rows={3}
-        />
-        <TextField
-          label="Quantidade"
-          type="number"
-          value={formData.quantidade}
-          onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
-        />
-        <TextField
-          label="Categoria"
-          value={formData.categoria}
-          onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-          required
-        />
-        <Button type="submit" variant="contained" color="primary" style={{ marginTop: '10px' }}>
-          Cadastrar
-        </Button>
-      </form>
+    <Container maxWidth="lg">
+      <Typography variant="h4" gutterBottom>
+        Gerenciamento de Produtos
+      </Typography>
+      
+      <Button 
+        variant="contained" 
+        color="primary" 
+        onClick={() => setOpenForm(true)}
+        style={{ marginBottom: '20px' }}
+      >
+        Adicionar Produto
+      </Button>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Nome</TableCell>
-              <TableCell>Código de Barras</TableCell>
-              <TableCell>Quantidade</TableCell>
-              <TableCell>Categoria</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {produtos.map((produto) => (
-              <TableRow key={produto.id}>
-                <TableCell>{produto.nome}</TableCell>
-                <TableCell>{produto.codigoBarras}</TableCell>
-                <TableCell>{produto.quantidade}</TableCell>
-                <TableCell>{produto.categoria}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {openForm && (
+        <FormProduto
+          produto={produtoEditando}
+          onSave={handleSalvarProduto}
+          onCancel={() => {
+            setOpenForm(false);
+            setProdutoEditando(null);
+          }}
+        />
+      )}
 
-      <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={handleCloseSnackbar}>
-        <Alert onClose={handleCloseSnackbar} severity={mensagem.tipo} sx={{ width: '100%' }}>
-          {mensagem.texto}
-        </Alert>
-      </Snackbar>
-    </div>
+      <Paper elevation={3}>
+        <TabelaProdutos
+          produtos={produtos}
+          onEdit={handleEditarProduto}
+          onDelete={handleExcluirProduto}
+        />
+      </Paper>
+    </Container>
   );
-}
+};
 
 export default ProdutosPage;
