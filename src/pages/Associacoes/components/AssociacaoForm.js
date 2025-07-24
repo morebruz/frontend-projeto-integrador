@@ -10,90 +10,103 @@ import {
   Select,
   MenuItem,
   Box,
-  Typography
+  Alert,
+  CircularProgress
 } from '@mui/material';
-import { getProdutos, getFornecedores } from '../../../services/api';
 
-const AssociacaoForm = ({ onClose, onAssociar }) => {
-  const [produtos, setProdutos] = useState([]);
+import { fornecedorService } from '../../services/api';
+
+export default function AssociacaoForm({ open, onClose, onAssociar, produtoSelecionado }) {
   const [fornecedores, setFornecedores] = useState([]);
-  const [selectedProduto, setSelectedProduto] = useState('');
-  const [selectedFornecedor, setSelectedFornecedor] = useState('');
+  const [fornecedorId, setFornecedorId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const carregarDados = async () => {
+    const carregarFornecedores = async () => {
       try {
-        const [produtosRes, fornecedoresRes] = await Promise.all([
-          getProdutos(),
-          getFornecedores()
-        ]);
-        setProdutos(produtosRes.data);
-        setFornecedores(fornecedoresRes.data);
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        setError(null);
+        setLoading(true);
+        const response = await fornecedorService.listar();
+        if (response && response.data) {
+          setFornecedores(response.data);
+        } else {
+          setFornecedores([]);
+          setError('Resposta inválida do servidor');
+        }
+      } catch (err) {
+        setError('Erro ao carregar fornecedores');
+      } finally {
+        setLoading(false);
       }
     };
-    carregarDados();
-  }, []);
 
-  const handleSubmit = () => {
-    if (!selectedProduto || !selectedFornecedor) {
-      alert('Selecione um produto e um fornecedor!');
+    if (open) {
+      carregarFornecedores();
+      setFornecedorId(''); // resetar seleção ao abrir modal
+    }
+  }, [open]);
+
+  const handleSubmit = async () => {
+    if (!fornecedorId) {
+      setError('Selecione um fornecedor');
       return;
     }
-    onAssociar(selectedProduto, selectedFornecedor);
-    onClose();
+
+    try {
+      setError(null);
+      setLoading(true);
+      await onAssociar(produtoSelecionado.id, fornecedorId);
+      onClose();
+    } catch (err) {
+      setError('Erro ao associar: ' + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Nova Associação</DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        Associar fornecedor a: {produtoSelecionado?.nome || ''}
+      </DialogTitle>
       <DialogContent>
-        <Box sx={{ my: 3 }}>
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Produto</InputLabel>
-            <Select
-              value={selectedProduto}
-              onChange={(e) => setSelectedProduto(e.target.value)}
-              label="Produto"
-            >
-              {produtos.map((produto) => (
-                <MenuItem key={produto.id} value={produto.id}>
-                  {produto.nome} - {produto.codigoBarras}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+        {loading && fornecedores.length === 0 ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
           <FormControl fullWidth>
-            <InputLabel>Fornecedor</InputLabel>
+            <InputLabel id="fornecedor-label">Fornecedor</InputLabel>
             <Select
-              value={selectedFornecedor}
-              onChange={(e) => setSelectedFornecedor(e.target.value)}
+              labelId="fornecedor-label"
+              value={fornecedorId}
+              onChange={(e) => setFornecedorId(e.target.value)}
               label="Fornecedor"
+              disabled={loading}
             >
-              {fornecedores.map((fornecedor) => (
-                <MenuItem key={fornecedor.id} value={fornecedor.id}>
-                  {fornecedor.nomeEmpresa} - {fornecedor.cnpj}
+              <MenuItem value="">Selecione um fornecedor</MenuItem>
+              {fornecedores.map((f) => (
+                <MenuItem key={f.id} value={f.id}>
+                  {f.nomeEmpresa} - {f.cnpj}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-        </Box>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained" 
-          color="primary"
-          disabled={!selectedProduto || !selectedFornecedor}
+        <Button onClick={onClose} disabled={loading}>Cancelar</Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading || !fornecedorId}
         >
-          Associar
+          {loading ? <CircularProgress size={24} /> : 'Associar'}
         </Button>
       </DialogActions>
     </Dialog>
   );
-};
-
-export default AssociacaoForm;
+}

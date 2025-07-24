@@ -1,42 +1,61 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api'; // Ajuste para a URL do seu backend
+// Cria instância Axios com baseURL correta
+const api = axios.create({
+  baseURL: 'http://localhost:3001/api',  // CORRETO: porta do backend
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
 
+// Interceptor global para erros
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('Erro na requisição:', error);
+    if (error.response) {
+      return Promise.reject({
+        message: error.response.data?.message || 'Erro no servidor',
+        status: error.response.status,
+        data: error.response.data,
+      });
+    } else if (error.request) {
+      return Promise.reject({
+        message: 'Servidor não respondeu',
+        status: 503,
+      });
+    } else {
+      return Promise.reject({
+        message: 'Erro na configuração da requisição',
+        status: 500,
+      });
+    }
+  }
+);
 
-export const getProdutos = () => axios.get(`${API_URL}/produtos`);
-export const createProduto = (data) => axios.post(`${API_URL}/produtos`, data);
-export const updateProduto = (id, data) => axios.put(`${API_URL}/produtos/${id}`, data);
-export const deleteProduto = (id) => axios.delete(`${API_URL}/produtos/${id}`);
-
-
-export const getFornecedores = () => axios.get(`${API_URL}/fornecedores`);
-export const createFornecedor = (data) => axios.post(`${API_URL}/fornecedores`, data);
-export const updateFornecedor = (id, data) => axios.put(`${API_URL}/fornecedores/${id}`, data);
-export const deleteFornecedor = (id) => axios.delete(`${API_URL}/fornecedores/${id}`);
-
-
-export const getAssociacoes = () => axios.get(`${API_URL}/associacoes`);
-export const associarProdutoFornecedor = (produtoId, fornecedorId) => 
-  axios.post(`${API_URL}/associacoes`, { produtoId, fornecedorId });
-export const desassociarProdutoFornecedor = (id) => 
-  axios.delete(`${API_URL}/associacoes/${id}`);
-
-
-export default {
-  
-  getProdutos,
-  createProduto,
-  updateProduto,
-  deleteProduto,
-  
- 
-  getFornecedores,
-  createFornecedor,
-  updateFornecedor,
-  deleteFornecedor,
-  
- 
-  getAssociacoes,
-  associarProdutoFornecedor,
-  desassociarProdutoFornecedor
+// Serviços Produtos
+export const produtoService = {
+  listar: () => api.get('/produtos'),
+  criar: (dados) => api.post('/produtos', dados),
+  atualizar: (id, dados) => api.put(`/produtos/${id}`, dados),
+  remover: (id) => api.delete(`/produtos/${id}`),
 };
+
+// Serviços Fornecedores
+export const fornecedorService = {
+  listar: () => api.get('/fornecedores'),
+  criar: (dados) => api.post('/fornecedores', dados),
+  atualizar: (id, dados) => api.put(`/fornecedores/${id}`, dados),
+  remover: (id) => api.delete(`/fornecedores/${id}`),
+};
+
+// Serviços Associações
+export const associacaoService = {
+  listar: () => api.get('/associacoes'),
+  associar: (produtoId, fornecedorId) => api.post('/associacoes', { produtoId, fornecedorId }),
+  desassociar: (id) => api.delete(`/associacoes/${id}`),
+};
+
+export default api;

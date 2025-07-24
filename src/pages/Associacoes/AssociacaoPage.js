@@ -1,92 +1,108 @@
 import { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Typography, 
-  Button,
+import {
   Box,
-  Alert
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress
 } from '@mui/material';
-import AssociacaoForm from './components/AssociacaoForm';
-import AssociacoesTable from './components/AssociacoesTable';
-import { 
-  getAssociacoes, 
-  associarProdutoFornecedor, 
-  desassociarProdutoFornecedor 
-} from "../../services/api";
+import { produtoService, fornecedorService } from '../../services/api';
 
-const AssociacaoPage = () => {
-  const [associacoes, setAssociacoes] = useState([]);
-  const [openForm, setOpenForm] = useState(false);
-  const [error, setError] = useState(null);
+const AssociacaoForm = ({ open = true, onClose, onAssociar, loading = false }) => {
+  const [produtos, setProdutos] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
+  const [produtoId, setProdutoId] = useState('');
+  const [fornecedorId, setFornecedorId] = useState('');
 
+  // Carregar produtos e fornecedores
   useEffect(() => {
-    carregarAssociacoes();
+    const carregarDados = async () => {
+      const [produtosRes, fornecedoresRes] = await Promise.all([
+        produtoService.listar(),
+        fornecedorService.listar()
+      ]);
+
+      if (produtosRes.success) setProdutos(produtosRes.data);
+      if (fornecedoresRes.success) setFornecedores(fornecedoresRes.data);
+    };
+
+    carregarDados();
   }, []);
 
-  const carregarAssociacoes = async () => {
-    try {
-      const response = await getAssociacoes();
-      setAssociacoes(response.data);
-    } catch (err) {
-      setError('Erro ao carregar associações');
-      console.error(err);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (produtoId && fornecedorId) {
+      await onAssociar(produtoId, fornecedorId);
+      handleClose();
     }
   };
 
-  const handleAssociar = async (produtoId, fornecedorId) => {
-    try {
-      await associarProdutoFornecedor(produtoId, fornecedorId);
-      carregarAssociacoes();
-    } catch (err) {
-      setError('Erro ao criar associação');
-      console.error(err);
-    }
-  };
-
-  const handleDesassociar = async (associacaoId) => {
-    try {
-      await desassociarProdutoFornecedor(associacaoId);
-      carregarAssociacoes();
-    } catch (err) {
-      setError('Erro ao remover associação');
-      console.error(err);
+  const handleClose = () => {
+    setProdutoId('');
+    setFornecedorId('');
+    if (typeof onClose === 'function') {
+      onClose();
     }
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Associações Produto-Fornecedor
-      </Typography>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Nova Associação</DialogTitle>
+      <DialogContent>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel>Produto</InputLabel>
+            <Select
+              value={produtoId}
+              onChange={(e) => setProdutoId(e.target.value)}
+              label="Produto"
+              disabled={loading}
+            >
+              {produtos.map((produto) => (
+                <MenuItem key={produto.id} value={produto.id}>
+                  {produto.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-        <Button 
-          variant="contained" 
-          onClick={() => setOpenForm(true)}
-        >
-          Nova Associação
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel>Fornecedor</InputLabel>
+            <Select
+              value={fornecedorId}
+              onChange={(e) => setFornecedorId(e.target.value)}
+              label="Fornecedor"
+              disabled={loading}
+            >
+              {fornecedores.map((fornecedor) => (
+                <MenuItem key={fornecedor.id} value={fornecedor.id}>
+                  {fornecedor.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose} disabled={loading}>
+          Cancelar
         </Button>
-      </Box>
-
-      {openForm && (
-        <AssociacaoForm 
-          onClose={() => setOpenForm(false)} 
-          onAssociar={handleAssociar}
-        />
-      )}
-      
-      <AssociacoesTable 
-        associacoes={associacoes} 
-        onDesassociar={handleDesassociar} 
-      />
-    </Container>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading || !produtoId || !fornecedorId}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Associar'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
-export default AssociacaoPage;
+export default AssociacaoForm;
